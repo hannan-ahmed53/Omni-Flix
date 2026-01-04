@@ -14,10 +14,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
+import com.example.project67.manager.ProfileManager;
 import com.example.project67.ui.home.HomeFragment;
 import com.example.project67.ui.search.SearchFragment;
 import com.example.project67.ui.settings.SettingsFragment;
-import com.example.project67.ui.trending.TrendingFragment;
+import com.example.project67.ui.news.NewsFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -33,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton searchIconButton;
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
+    private ProfileManager profileManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         mDatabase = FirebaseDatabase.getInstance().getReference();
+        profileManager = new ProfileManager(this);
 
         userNameTop = findViewById(R.id.user_name_top);
         searchIconButton = findViewById(R.id.search_icon_button);
@@ -65,6 +68,14 @@ public class MainActivity extends AppCompatActivity {
     }
     
     private void loadUserName() {
+        // First, try to get selected profile name
+        String selectedProfileName = profileManager.getSelectedProfileName();
+        if (selectedProfileName != null && !selectedProfileName.isEmpty()) {
+            userNameTop.setText(selectedProfileName);
+            return;
+        }
+        
+        // Fallback to Firebase user name
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
             mDatabase.child("users").child(user.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
@@ -73,19 +84,50 @@ public class MainActivity extends AppCompatActivity {
                     if (snapshot.exists()) {
                         String firstName = snapshot.child("firstName").getValue(String.class);
                         String lastName = snapshot.child("lastName").getValue(String.class);
-                        if (firstName != null && lastName != null) {
+                        if (firstName != null && !firstName.isEmpty() && lastName != null && !lastName.isEmpty()) {
                             userNameTop.setText(firstName + " " + lastName);
-                        } else if (firstName != null) {
+                        } else if (firstName != null && !firstName.isEmpty()) {
                             userNameTop.setText(firstName);
+                        } else if (lastName != null && !lastName.isEmpty()) {
+                            userNameTop.setText(lastName);
+                        } else {
+                            // Fallback to email if name not available
+                            String email = user.getEmail();
+                            if (email != null && !email.isEmpty()) {
+                                String emailName = email.split("@")[0];
+                                userNameTop.setText(emailName);
+                            }
+                        }
+                    } else {
+                        // User data doesn't exist, use email
+                        String email = user.getEmail();
+                        if (email != null && !email.isEmpty()) {
+                            String emailName = email.split("@")[0];
+                            userNameTop.setText(emailName);
                         }
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
+                    // On error, try to use email
+                    String email = user.getEmail();
+                    if (email != null && !email.isEmpty()) {
+                        String emailName = email.split("@")[0];
+                        userNameTop.setText(emailName);
+                    }
                 }
             });
+        } else {
+            userNameTop.setText("Guest");
         }
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh user name when returning to MainActivity
+        loadUserName();
     }
 
     @Override
@@ -126,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(this, MyListActivity.class));
             return false; // Don't change fragment
         } else if (itemId == R.id.navigation_trending) {
-            selectedFragment = new TrendingFragment();
+            selectedFragment = new NewsFragment();
         } else if (itemId == R.id.navigation_settings) {
             selectedFragment = new SettingsFragment();
         }

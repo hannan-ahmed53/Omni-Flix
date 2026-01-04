@@ -15,6 +15,9 @@ public interface ProfileDao {
     @androidx.room.Delete
     void delete(Profile profile);
 
-    @Query("SELECT * FROM profiles")
-    List<Profile> getAllProfiles();
+    @Query("SELECT * FROM profiles WHERE user_id = :userId")
+    List<Profile> getProfilesByUserId(String userId);
+    
+    @Query("DELETE FROM profiles WHERE user_id = :userId")
+    void deleteAllProfilesByUserId(String userId);
 }

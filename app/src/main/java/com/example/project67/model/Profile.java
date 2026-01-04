@@ -18,6 +18,9 @@ public class Profile {
     
     @ColumnInfo(name = "password")
     public String password;
+    
+    @ColumnInfo(name = "user_id")
+    public String userId; // Firebase user ID to isolate profiles per user
 
     // Default constructor for Room
     public Profile() {
@@ -25,23 +28,26 @@ public class Profile {
 
     // Constructor for creating new profiles
     @Ignore
-    public Profile(String name) {
+    public Profile(String name, String userId) {
         this.name = name;
         this.profileImage = "guts"; // Default to Guts image
         this.password = "";
+        this.userId = userId;
     }
     
     @Ignore
-    public Profile(String name, String profileImage) {
+    public Profile(String name, String profileImage, String userId) {
         this.name = name;
         this.profileImage = profileImage;
         this.password = "";
+        this.userId = userId;
     }
     
     @Ignore
-    public Profile(String name, String profileImage, String password) {
+    public Profile(String name, String profileImage, String password, String userId) {
         this.name = name;
         this.profileImage = profileImage;
         this.password = password;
+        this.userId = userId;
     }
 }

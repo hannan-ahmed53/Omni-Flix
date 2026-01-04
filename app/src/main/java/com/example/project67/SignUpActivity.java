@@ -10,6 +10,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.project67.data.AppDatabase;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
@@ -17,6 +18,8 @@ import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SignUpActivity extends AppCompatActivity {
 
@@ -30,6 +33,8 @@ public class SignUpActivity extends AppCompatActivity {
     
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
+    private AppDatabase db;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +43,7 @@ public class SignUpActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         mDatabase = FirebaseDatabase.getInstance().getReference();
+        db = AppDatabase.getDatabase(this);
 
         firstNameEditText = findViewById(R.id.first_name);
         lastNameEditText = findViewById(R.id.last_name);
@@ -108,25 +114,58 @@ public class SignUpActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
+                            String uid = user.getUid();
+                            if (uid == null || uid.isEmpty()) {
+                                Toast.makeText(SignUpActivity.this, 
+                                        "Failed to get user ID", 
+                                        Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            
                             // Save user details to Firebase Realtime Database
+                            // Path: /users/{uid}
                             Map<String, Object> userData = new HashMap<>();
                             userData.put("firstName", firstName);
                             userData.put("lastName", lastName);
                             userData.put("email", email);
                             
-                            mDatabase.child("users").child(user.getUid()).setValue(userData)
+                            DatabaseReference userRef = mDatabase.child("users").child(uid);
+                            userRef.setValue(userData)
                                     .addOnCompleteListener(task1 -> {
                                         if (task1.isSuccessful()) {
                                             Toast.makeText(SignUpActivity.this, 
                                                     "Account created successfully!", 
                                                     Toast.LENGTH_SHORT).show();
+                                            
+                                            // Clear any old profile data for this user
+                                            clearOldProfileData(uid);
+                                            
                                             startActivity(new Intent(SignUpActivity.this, 
                                                     ProfileSelectionActivity.class));
                                             finish();
                                         } else {
-                                            Toast.makeText(SignUpActivity.this, 
-                                                    "Failed to save user data", 
-                                                    Toast.LENGTH_SHORT).show();
+                                            String errorMsg = task1.getException() != null ? 
+                                                    task1.getException().getMessage() : "Failed to save user data";
+                                            
+                                            if (errorMsg.contains("Permission denied")) {
+                                                Toast.makeText(SignUpActivity.this, 
+                                                        "Permission denied. Please check Firebase Database rules. " +
+                                                        "Rules should allow authenticated users to write to /users/{uid}", 
+                                                        Toast.LENGTH_LONG).show();
+                                            } else {
+                                                Toast.makeText(SignUpActivity.this, 
+                                                        "Failed to save user data: " + errorMsg, 
+                                                        Toast.LENGTH_LONG).show();
+                                            }
+                                            
+                                            // Delete the Firebase auth user if data save failed
+                                            user.delete().addOnCompleteListener(task2 -> {
+                                                if (task2.isSuccessful()) {
+                                                    Toast.makeText(SignUpActivity.this, 
+                                                            "Please try signing up again", 
+                                                            Toast.LENGTH_SHORT).show();
+                                                }
+                                            });
                                         }
                                     });
                         }
@@ -136,6 +175,12 @@ public class SignUpActivity extends AppCompatActivity {
                         Toast.makeText(SignUpActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+    
+    private void clearOldProfileData(String userId) {
+        executor.execute(() -> {
+            db.profileDao().deleteAllProfilesByUserId(userId);
+        });
     }
 }
 

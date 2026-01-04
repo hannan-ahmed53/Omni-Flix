@@ -16,6 +16,7 @@ import com.example.project67.data.AppDatabase;
 import com.example.project67.manager.MovieClickManager;
 import com.example.project67.model.Movie;
 
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -53,6 +54,20 @@ public class DetailActivity extends AppCompatActivity {
             }
 
             updateMyListButton(addToListButton, movie);
+
+            // Load current status from database
+            executor.execute(() -> {
+                List<Movie> myList = db.movieDao().getMyList();
+                boolean isInList = false;
+                for (Movie m : myList) {
+                    if (m.getTitle().equals(movie.getTitle())) {
+                        isInList = true;
+                        break;
+                    }
+                }
+                movie.isInMyList = isInList;
+                runOnUiThread(() -> updateMyListButton(addToListButton, movie));
+            });
 
             addToListButton.setOnClickListener(v -> {
                 movie.isInMyList = !movie.isInMyList;

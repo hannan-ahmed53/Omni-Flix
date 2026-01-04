@@ -66,23 +66,32 @@ public class ProfileAdapter extends RecyclerView.Adapter<ProfileAdapter.ProfileV
         public void bind(final Profile profile, final OnProfileClickListener listener, final OnProfileDeleteListener deleteListener) {
             nameTextView.setText(profile.name);
             
-            // Load profile image
+            // Load profile image - check if it's a URI or drawable resource
             String imageName = profile.profileImage != null ? profile.profileImage : "guts";
-            int imageResource = itemView.getContext().getResources().getIdentifier(
-                    imageName, "drawable", itemView.getContext().getPackageName());
             
-            if (imageResource != 0) {
-                Glide.with(itemView.getContext())
-                        .load(imageResource)
-                        .into(profileImageView);
-            } else {
-                // Fallback to guts image if not found
-                int gutsResource = itemView.getContext().getResources().getIdentifier(
-                        "guts", "drawable", itemView.getContext().getPackageName());
-                if (gutsResource != 0) {
+            // Check if it's a URI (starts with content:// or http://)
+            if (imageName.startsWith("content://") || imageName.startsWith("http://") || imageName.startsWith("https://")) {
+                try {
+                    android.net.Uri imageUri = android.net.Uri.parse(imageName);
                     Glide.with(itemView.getContext())
-                            .load(gutsResource)
+                            .load(imageUri)
                             .into(profileImageView);
+                } catch (Exception e) {
+                    // Fallback to default
+                    loadDefaultImage();
+                }
+            } else {
+                // Try to load as drawable resource
+                int imageResource = itemView.getContext().getResources().getIdentifier(
+                        imageName, "drawable", itemView.getContext().getPackageName());
+                
+                if (imageResource != 0) {
+                    Glide.with(itemView.getContext())
+                            .load(imageResource)
+                            .into(profileImageView);
+                } else {
+                    // Fallback to default guts image
+                    loadDefaultImage();
                 }
             }
             
@@ -94,6 +103,16 @@ public class ProfileAdapter extends RecyclerView.Adapter<ProfileAdapter.ProfileV
                         deleteListener.onProfileDelete(profile);
                     }
                 });
+            }
+        }
+        
+        private void loadDefaultImage() {
+            int gutsResource = itemView.getContext().getResources().getIdentifier(
+                    "guts", "drawable", itemView.getContext().getPackageName());
+            if (gutsResource != 0) {
+                Glide.with(itemView.getContext())
+                        .load(gutsResource)
+                        .into(profileImageView);
             }
         }
     }
